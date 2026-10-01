@@ -30,11 +30,24 @@
     </div>
 
     <p class="lista__contador">
-      Mostrando {{ librosFiltrados.length }} de {{ libroStore.libros.length }} libro(s)
+    Mostrando {{ librosFiltrados.length }} de {{ libros.length }} libro(s)
     </p>
 
-    <p v-if="librosFiltrados.length === 0" class="lista__vacio">
-      No hay libros disponibles con esos filtros.
+    <p class="lista__contador">
+  {{ cantidadFavoritos === 1 ? '♥ 1 favorito' : `♥ ${cantidadFavoritos} favoritos` }}
+  </p>
+
+    <p v-if="loading" class="lista__vacio">
+    Cargando libros...
+    </p>
+
+    <p v-else-if="error" class="lista__vacio">
+        {{ error }}
+    </p>
+    
+
+    <p v-else-if="librosFiltrados.length === 0" class="lista__vacio">
+  No hay libros disponibles con esos filtros.
     </p>
 
     <div v-else class="lista__grid">
@@ -57,30 +70,43 @@ import { useRoute, useRouter } from 'vue-router'
 import Libro from '../components/Libro.vue'
 import FormularioLibro from '../components/FormularioLibro.vue'
 import { libroStore } from '../data/libros'
+import { useStore } from 'vuex'
 
-const busqueda = ref('')
-const categoriaSeleccionada = ref('')
+const store = useStore()
+const busqueda = computed({
+  get: () => store.state.filtros.busqueda,
+  set: valor => store.dispatch('filtros/actualizarBusqueda', valor)
+})
+
+const categoriaSeleccionada = computed({
+  get: () => store.state.filtros.categoriaSeleccionada,
+  set: valor => store.dispatch('filtros/actualizarCategoria', valor)
+})
+const libros = computed(() => store.state.libros.libros)
+const loading = computed(() => store.state.libros.loading)
+const error = computed(() => store.state.libros.error)
+
 
 const categoriasDisponibles = computed(() =>
-  [...new Set(libroStore.libros.map(l => l.categoria))].sort()
+  [...new Set(libros.value.map(l => l.categoria))].sort()
 )
 
-const librosFiltrados = computed(() =>
-  libroStore.libros.filter(libro => {
-    const coincideAutor = libro.autor
-      .toLowerCase()
-      .includes(busqueda.value.toLowerCase())
-    const coincideCategoria =
-      !categoriaSeleccionada.value || libro.categoria === categoriaSeleccionada.value
-    return coincideAutor && coincideCategoria
-  })
+const librosFiltrados = computed(
+  () => store.getters['libros/librosFiltrados']
 )
 
+const cantidadFavoritos = computed(
+  () => store.getters['favoritos/cantidadFavoritos']
+)
+   
+  
+ 
 const libroEditando = ref(null)
 const route = useRoute()
 const router = useRouter()
 
-onMounted(() => {
+onMounted(async () => {
+  await store.dispatch('libros/cargarLibros')
   const idAEditar = route.query.editar
   if (idAEditar) {
     const libro = libroStore.obtenerPorId(idAEditar)
@@ -89,8 +115,15 @@ onMounted(() => {
   }
 })
 
-function agregarLibro(libro) {
-  libroStore.agregarLibro(libro)
+async function agregarLibro(libro) {
+  console.log('=== LIBRO RECIBIDO DEL FORMULARIO ===', libro)
+
+  try {
+    const resultado = await store.dispatch('libros/agregarLibro', libro)
+    console.log('=== LIBRO GUARDADO ===', resultado)
+  } catch (error) {
+    console.error('=== ERROR AL AGREGAR ===', error)
+  }
 }
 
 function iniciarEdicion(libro) {
@@ -98,21 +131,32 @@ function iniciarEdicion(libro) {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-function actualizarLibro(id, datos) {
-  libroStore.actualizarLibro(id, datos)
-  libroEditando.value = null
+async function actualizarLibro(id, datos) {
+  try {
+    await store.dispatch('libros/actualizarLibro', {
+      id,
+      datos
+    })
+
+    libroEditando.value = null
+  } catch (error) {
+    console.error('Error al actualizar el libro:', error)
+  }
 }
 
 function cancelarEdicion() {
   libroEditando.value = null
 }
 
-function eliminarLibro(id) {
-  if (confirm('¿Seguro que querés eliminar este libro?')) {
-    if (libroEditando.value && libroEditando.value.id === id) {
+async function eliminarLibro(id) {
+  try {
+    await store.dispatch('libros/eliminarLibro', id)
+
+    if (libroEditando.value?.id === id) {
       libroEditando.value = null
     }
-    libroStore.eliminarLibro(id)
+  } catch (error) {
+    console.error('Error al eliminar el libro:', error)
   }
 }
 

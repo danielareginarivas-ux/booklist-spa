@@ -1,11 +1,26 @@
 <template>
     <article class="libro-card" :class="{ 'libro-card--destacado': destacado }">
     <div class="libro-card__header">
-      <h3 class="libro-card__titulo">{{ libro.titulo }}</h3>
-      <span class="libro-card__categoria" :title="`Categoría: ${libro.categoria}`">
-        {{ libro.categoria }}
-      </span>
-    </div>
+  <h3 class="libro-card__titulo">{{ libro.titulo }}</h3>
+
+  <div class="libro-card__header-derecha">
+    <span
+      class="libro-card__categoria"
+      :title="`Categoría: ${libro.categoria}`"
+    >
+      {{ libro.categoria }}
+    </span>
+
+    <button
+      class="libro-card__favorito"
+      :class="{ 'libro-card__favorito--activo': esFavorito }"
+      :title="esFavorito ? 'Quitar de favoritos' : 'Agregar a favoritos'"
+      @click="alternarFavorito"
+    >
+      {{ esFavorito ? '♥' : '♡' }}
+    </button>
+  </div>
+</div>
 
     <p class="libro-card__autor">✍️ {{ libro.autor }}</p>
 
@@ -18,6 +33,7 @@
 
     <div class="libro-card__acciones">
       <router-link :to="`/libros/${libro.id}`" class="btn btn--secundario">
+       
         Ver detalle
       </router-link>
       <button
@@ -39,8 +55,12 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
+import { useStore } from 'vuex'
 
-defineProps({
+const store = useStore()
+
+const props = defineProps({
   libro: {
     type: Object,
     required: true
@@ -58,6 +78,14 @@ defineProps({
     default: true
   }
 })
+
+const esFavorito = computed(() =>
+  store.getters['favoritos/esFavorito'](props.libro.id)
+)
+
+function alternarFavorito() {
+  store.dispatch('favoritos/alternarFavorito', props.libro.id)
+}
 
 defineEmits(['eliminar', 'editar'])
 </script>
@@ -125,5 +153,31 @@ defineEmits(['eliminar', 'editar'])
   margin-top: 0.5rem;
   display: flex;
   gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.libro-card__header-derecha {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.libro-card__favorito {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1.4rem;
+  line-height: 1;
+  padding: 0.2rem;
+  color: var(--color-primario);
+  transition: transform 0.15s ease;
+}
+
+.libro-card__favorito:hover {
+  transform: scale(1.2);
+}
+
+.libro-card__favorito--activo {
+  font-size: 1.5rem;
 }
 </style>
